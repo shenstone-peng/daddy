@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ios-bg: #F2F2F7;
+  --color-ios-card: #FFFFFF;
+  --color-ios-text: #1C1C1E;
+  --color-ios-text-secondary: #8E8E93;
+  --color-ios-blue: #007AFF;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  background-color: var(--color-ios-bg);
+  color: var(--color-ios-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* Apple Minimalist Card Style */
+.ios-card {
+  background-color: var(--color-ios-card);
+  border-radius: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+
