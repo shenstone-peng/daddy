@@ -24,11 +24,12 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
+import { CatchUpDeck } from './components/CatchUpDeck';
 import { downloadCalendarFile } from './lib/calendar';
 import {
+  addDays,
   compareDateInputs,
   diffInDays,
-  formatCompactDate,
   formatHeaderDate,
   formatLongDate,
   formatMonthDay,
@@ -66,7 +67,7 @@ type TaskDraft = {
   notes: string;
 };
 
-type TaskFilter = 'pending' | 'all' | 'done';
+type TaskFilter = 'current' | 'later' | 'rescue' | 'done';
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -80,8 +81,9 @@ const tabMeta: { id: Tab; label: string; icon: typeof LayoutGrid }[] = [
 ];
 
 const taskFilterMeta: { id: TaskFilter; label: string }[] = [
-  { id: 'pending', label: '进行中' },
-  { id: 'all', label: '全部' },
+  { id: 'current', label: '当前要做' },
+  { id: 'later', label: '以后再说' },
+  { id: 'rescue', label: '需补救' },
   { id: 'done', label: '已完成' },
 ];
 
@@ -197,8 +199,9 @@ function buildCalendarEntries(state: AppState) {
 function App() {
   const [state, setState] = useState<AppState>(() => loadAppState());
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
-  const [taskFilter, setTaskFilter] = useState<TaskFilter>('pending');
+  const [taskFilter, setTaskFilter] = useState<TaskFilter>('current');
   const [showProfileSheet, setShowProfileSheet] = useState(false);
+  const [catchUpTaskIds, setCatchUpTaskIds] = useState<string[]>([]);
   const [taskDraft, setTaskDraft] = useState<TaskDraft>(() => createTaskDraft());
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>(() => {
     const profile = loadAppState().profile;
@@ -250,23 +253,27 @@ function App() {
 
   const profile = state.profile;
   const overview = profile ? getPregnancyOverview(profile.dueDate) : null;
-  const pendingTasks = state.tasks.filter((task) => task.status === 'todo');
-  const completedTasks = state.tasks.filter((task) => task.status === 'done');
-  const overdueTasks = pendingTasks.filter((task) => diffInDays(parseDateInput(task.dueDate), new Date()) < 0);
-  const upcomingTasks = pendingTasks.filter((task) => {
-    const daysUntil = diffInDays(parseDateInput(task.dueDate), new Date());
+  const pendingTasks = sortTasks(state.tasks.filter((task) => task.status === 'todo'));
+  const completedTasks = sortTasks(state.tasks.filter((task) => task.status === 'done'));
+  const getDaysUntilTask = (task: TaskItem) => diffInDays(parseDateInput(task.dueDate), new Date());
+  const rescueTasks = pendingTasks.filter((task) => getDaysUntilTask(task) < 0);
+  const currentTasks = pendingTasks.filter((task) => {
+    const daysUntil = getDaysUntilTask(task);
     return daysUntil >= 0 && daysUntil <= 7;
   });
-  const focusTask =
-    [...upcomingTasks].sort((left, right) => compareDateInputs(left.dueDate, right.dueDate))[0] ??
-    [...pendingTasks].sort((left, right) => compareDateInputs(left.dueDate, right.dueDate))[0];
-  const laterTasks = pendingTasks.filter((task) => diffInDays(parseDateInput(task.dueDate), new Date()) > 7);
+  const laterTasks = pendingTasks.filter((task) => getDaysUntilTask(task) > 7);
+  const focusTask = currentTasks[0] ?? rescueTasks[0] ?? laterTasks[0];
+  const todayTasks = currentTasks.filter((task) => getDaysUntilTask(task) <= 1);
+  const weekPushTasks = currentTasks.slice(0, 4);
+  const nextStageTask = laterTasks[0];
   const filteredTasks =
-    taskFilter === 'all'
-      ? sortTasks(state.tasks)
-      : taskFilter === 'done'
-        ? sortTasks(completedTasks)
-        : sortTasks(pendingTasks);
+    taskFilter === 'done'
+      ? completedTasks
+      : taskFilter === 'later'
+        ? laterTasks
+        : taskFilter === 'rescue'
+          ? rescueTasks
+          : currentTasks;
   const calendarEntries = buildCalendarEntries(state);
   const exportedCount =
     state.tasks.filter((task) => task.calendarExported).length +
@@ -274,6 +281,15 @@ function App() {
 
   const reminderCards = sortMilestones(state.milestones).slice(0, 6);
   const supportCopy = overview ? getCompanionSuggestion(overview.currentWeek, overview.trimester, focusTask) : '';
+  const catchUpTask = catchUpTaskIds.length ? state.tasks.find((task) => task.id === catchUpTaskIds[0]) ?? null : null;
+  const taskFilterDescription =
+    taskFilter === 'current'
+      ? '只保留这一周该推进的事。先做眼前的，别和整个孕期硬碰硬。'
+      : taskFilter === 'later'
+        ? '这些还没到火烧眉毛的时候，先挂着，等进入窗口再处理。'
+        : taskFilter === 'rescue'
+          ? '如果真错过了，不要自责，先把最有影响的补上。'
+          : '已处理的系统事项和自定义任务都收在这里，必要时回看即可。';
   const isAppleMobile =
     typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent.toLowerCase());
 
@@ -302,7 +318,16 @@ function App() {
       createdAt: profile?.createdAt ?? new Date().toISOString(),
     };
 
-    setState((previousState) => buildSeededState(nextProfile, previousState.profile ? previousState : emptyAppState));
+    const nextState = buildSeededState(nextProfile, profile ? state : emptyAppState);
+    setState(nextState);
+    if (!profile) {
+      const today = toDateInputValue(new Date());
+      setCatchUpTaskIds(
+        nextState.tasks
+          .filter((task) => task.system && task.status === 'todo' && compareDateInputs(task.dueDate, today) < 0)
+          .map((task) => task.id),
+      );
+    }
     setShowProfileSheet(false);
   }
 
@@ -343,6 +368,30 @@ function App() {
     setState((previousState) => ({
       ...previousState,
       tasks: previousState.tasks.filter((task) => task.id !== taskId),
+    }));
+  }
+
+  function deferTask(taskId: string, days = 14) {
+    setState((previousState) => ({
+      ...previousState,
+      tasks: sortTasks(
+        previousState.tasks.map((task) => {
+          if (task.id !== taskId) {
+            return task;
+          }
+
+          const nextDueDate = toDateInputValue(addDays(parseDateInput(task.dueDate), days));
+          const nextReminderDate = task.reminderDate
+            ? toDateInputValue(addDays(parseDateInput(task.reminderDate), days))
+            : undefined;
+
+          return {
+            ...task,
+            dueDate: nextDueDate,
+            reminderDate: nextReminderDate,
+          };
+        }),
+      ),
     }));
   }
 
@@ -452,6 +501,30 @@ function App() {
     }
   }
 
+  function reviewCatchUpTask(action: 'done' | 'rescue') {
+    const taskId = catchUpTaskIds[0];
+    if (!taskId) {
+      return;
+    }
+
+    setState((previousState) => ({
+      ...previousState,
+      tasks: sortTasks(
+        previousState.tasks.map((task) => {
+          if (task.id !== taskId) {
+            return task;
+          }
+
+          return {
+            ...task,
+            status: action === 'done' ? 'done' : 'todo',
+          };
+        }),
+      ),
+    }));
+    setCatchUpTaskIds((current) => current.slice(1));
+  }
+
   return (
     <div className="mx-auto min-h-svh w-full max-w-[430px] px-3 py-4 sm:px-6 sm:py-8">
       <div className="app-shell relative min-h-[calc(100svh-2rem)] overflow-hidden sm:min-h-[860px]">
@@ -535,42 +608,46 @@ function App() {
                   <div className="hero-pill">
                     <Clock3 className="h-4 w-4" />
                     <div>
-                      <span>今日关注</span>
-                      <strong>{upcomingTasks.length || 0} 件</strong>
+                      <span>今天盯住</span>
+                      <strong>{todayTasks.length || (focusTask ? 1 : 0)} 件</strong>
                     </div>
                   </div>
                   <div className="hero-pill">
                     <CircleCheckBig className="h-4 w-4" />
                     <div>
-                      <span>已完成</span>
-                      <strong>{completedTasks.length} 项</strong>
+                      <span>本周推进</span>
+                      <strong>{currentTasks.length} 项</strong>
                     </div>
                   </div>
                   <div className="hero-pill">
                     <Download className="h-4 w-4" />
                     <div>
-                      <span>已导日历</span>
-                      <strong>{exportedCount}</strong>
+                      <span>以后事项</span>
+                      <strong>{laterTasks.length}</strong>
                     </div>
                   </div>
                 </div>
+
+                <p className="mt-4 text-sm leading-6 text-white/76">
+                  首页只显示眼前阶段，不再把整段孕期的事项一次性压到你面前。
+                </p>
               </section>
 
               <section className="ios-card">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="section-eyebrow">今日重点</p>
+                    <p className="section-eyebrow">今天只盯这一件</p>
                     <h3 className="mt-1 text-xl font-semibold text-slate-900">
-                      {focusTask ? focusTask.title : '今天先留一点弹性给她'}
+                      {focusTask ? focusTask.title : '今天先把节奏放慢一点'}
                     </h3>
                     <p className="mt-2 text-sm leading-6 text-slate-500">
                       {focusTask
                         ? `${formatMonthDay(focusTask.dueDate)} · ${formatRelativeLabel(focusTask.dueDate)}`
                         : '当前没有紧急待办，可以先陪她散步、补觉，或者把后续检查预约提前确认。'}
                     </p>
-                    {overdueTasks.length ? (
+                    {rescueTasks.length ? (
                       <p className="mt-2 text-xs font-medium text-rose-500">
-                        另有 {overdueTasks.length} 项逾期任务，建议进清单页逐一处理。
+                        另有 {rescueTasks.length} 项需要补救，建议进清单页逐一处理。
                       </p>
                     ) : null}
                   </div>
@@ -597,62 +674,116 @@ function App() {
                 </div>
               </section>
 
-              <section>
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="section-title">本周必须</h3>
-                  <span className="text-xs font-medium text-slate-400">{upcomingTasks.length} 项</span>
-                </div>
-                <div className="space-y-3">
-                  {(upcomingTasks.length ? upcomingTasks : pendingTasks.slice(0, 3)).map((task) => (
-                    <article key={task.id} className="list-card">
-                      <div className="flex items-start gap-3">
-                        <button
-                          className="mt-1 text-indigo-500"
-                          type="button"
-                          onClick={() => toggleTaskStatus(task.id)}
-                          aria-label="切换完成状态"
-                        >
-                          {task.status === 'done' ? (
-                            <CircleCheckBig className="h-5 w-5" />
-                          ) : (
-                            <Circle className="h-5 w-5" />
-                          )}
-                        </button>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h4 className="text-[16px] font-semibold text-slate-900">{task.title}</h4>
-                            <span className={`category-badge ${categoryTone[task.category]}`}>{categoryLabel[task.category]}</span>
+              {rescueTasks.length ? (
+                <section className="ios-card border-rose-100 bg-[linear-gradient(135deg,rgba(255,247,247,0.96),rgba(255,255,255,0.92))]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="section-eyebrow text-rose-400">需补救</p>
+                      <h3 className="mt-1 text-xl font-semibold text-slate-900">先补最重要的，不用一次清空</h3>
+                    </div>
+                    <span className="category-badge bg-rose-100 text-rose-600">{rescueTasks.length} 项</span>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {rescueTasks.slice(0, 2).map((task) => (
+                      <div key={task.id} className="rounded-[22px] bg-white/88 px-4 py-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[15px] font-semibold text-slate-900">{task.title}</p>
+                            <p className="mt-1 text-sm text-slate-500">{task.notes}</p>
+                            <p className="mt-2 text-xs font-medium text-rose-500">
+                              {formatMonthDay(task.dueDate)} · {formatRelativeLabel(task.dueDate)}
+                            </p>
                           </div>
-                          <p className="mt-2 text-sm leading-6 text-slate-500">{task.notes}</p>
-                          <div className="mt-3 flex items-center gap-3 text-xs font-medium text-slate-400">
-                            <span>{formatLongDate(task.dueDate)}</span>
-                            <span>{priorityLabel[task.priority]}</span>
-                          </div>
+                          <button
+                            className="ghost-button"
+                            type="button"
+                            onClick={() => deferTask(task.id)}
+                            aria-label="移到以后"
+                          >
+                            <Clock3 className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
               <section>
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="section-title">后续准备</h3>
+                  <h3 className="section-title">本周推进</h3>
+                  <span className="text-xs font-medium text-slate-400">{currentTasks.length} 项</span>
+                </div>
+                {weekPushTasks.length ? (
+                  <div className="space-y-3">
+                    {weekPushTasks.map((task) => (
+                      <article key={task.id} className="list-card">
+                        <div className="flex items-start gap-3">
+                          <button
+                            className="mt-1 text-indigo-500"
+                            type="button"
+                            onClick={() => toggleTaskStatus(task.id)}
+                            aria-label="切换完成状态"
+                          >
+                            <Circle className="h-5 w-5" />
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="text-[16px] font-semibold text-slate-900">{task.title}</h4>
+                              <span className={`category-badge ${categoryTone[task.category]}`}>{categoryLabel[task.category]}</span>
+                            </div>
+                            <p className="mt-2 text-sm leading-6 text-slate-500">{task.notes}</p>
+                            <div className="mt-3 flex items-center gap-3 text-xs font-medium text-slate-400">
+                              <span>{formatLongDate(task.dueDate)}</span>
+                              <span>{priorityLabel[task.priority]}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <PackageOpen className="h-8 w-8 text-slate-300" />
+                    <p>这周没有新的硬任务，保持节奏就好。</p>
+                  </div>
+                )}
+              </section>
+
+              <section className="ios-card">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="section-title">下阶段准备</h3>
                   <span className="text-xs font-medium text-slate-400">{laterTasks.length} 项</span>
                 </div>
-                <div className="ios-card divide-y divide-slate-100 p-0">
-                  {(laterTasks.length ? laterTasks : state.tasks.slice(0, 3)).slice(0, 5).map((task) => (
-                    <div key={task.id} className="flex items-center justify-between gap-4 px-4 py-4">
-                      <div className="min-w-0">
-                        <p className="text-[15px] font-semibold text-slate-900">{task.title}</p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {formatCompactDate(task.dueDate)} · {formatRelativeLabel(task.dueDate)}
-                        </p>
-                      </div>
-                      <span className={`category-badge ${categoryTone[task.category]}`}>{categoryLabel[task.category]}</span>
+                {nextStageTask ? (
+                  <div className="rounded-[26px] bg-[linear-gradient(135deg,rgba(240,243,255,0.8),rgba(255,255,255,0.98))] p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className={`category-badge ${categoryTone[nextStageTask.category]}`}>
+                        {categoryLabel[nextStageTask.category]}
+                      </span>
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={() => startTransition(() => setActiveTab('tasks'))}
+                        aria-label="查看清单"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
                     </div>
-                  ))}
-                </div>
+                    <h4 className="mt-4 text-[20px] font-semibold text-slate-900">{nextStageTask.title}</h4>
+                    <p className="mt-2 text-sm leading-6 text-slate-500">{nextStageTask.notes}</p>
+                    <div className="mt-4 flex flex-wrap items-center gap-3 text-xs font-medium text-slate-400">
+                      <span>{formatLongDate(nextStageTask.dueDate)}</span>
+                      <span>{formatRelativeLabel(nextStageTask.dueDate)}</span>
+                      {laterTasks.length > 1 ? <span>后面还有 {laterTasks.length - 1} 项</span> : null}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <PackageOpen className="h-8 w-8 text-slate-300" />
+                    <p>后续准备已经很清楚了，先把当前这一阶段走稳。</p>
+                  </div>
+                )}
               </section>
             </div>
           ) : null}
@@ -662,11 +793,32 @@ function App() {
               <section className="ios-card">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="section-eyebrow">快速添加</p>
-                    <h3 className="mt-1 text-xl font-semibold text-slate-900">把想做的事立刻变成计划</h3>
+                    <p className="section-eyebrow">任务分舱</p>
+                    <h3 className="mt-1 text-xl font-semibold text-slate-900">把所有事分到现在、以后和补救</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-500">
+                      当前要做只放这一周的事，更多内容都被主动往后收，减少决策噪音。
+                    </p>
                   </div>
                   <div className="feature-icon bg-indigo-100 text-indigo-700">
                     <Plus className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="summary-chip">
+                    <span>当前要做</span>
+                    <strong>{currentTasks.length}</strong>
+                  </div>
+                  <div className="summary-chip">
+                    <span>以后再说</span>
+                    <strong>{laterTasks.length}</strong>
+                  </div>
+                  <div className="summary-chip summary-chip-warn">
+                    <span>需补救</span>
+                    <strong>{rescueTasks.length}</strong>
+                  </div>
+                  <div className="summary-chip summary-chip-success">
+                    <span>已完成</span>
+                    <strong>{completedTasks.length}</strong>
                   </div>
                 </div>
                 <form className="mt-5 grid gap-3" onSubmit={addCustomTask}>
@@ -739,6 +891,7 @@ function App() {
                     </button>
                   ))}
                 </div>
+                <p className="mt-4 text-sm leading-6 text-slate-500">{taskFilterDescription}</p>
                 <div className="mt-5 space-y-3">
                   {filteredTasks.length ? (
                     filteredTasks.map((task) => (
@@ -774,11 +927,31 @@ function App() {
                           </div>
                         </div>
                         <div className="flex flex-col gap-2">
-                          <button className="ghost-button" type="button" onClick={() => exportOneTask(task)}>
+                          {task.status === 'todo' ? (
+                            <button
+                              className="ghost-button"
+                              type="button"
+                              onClick={() => deferTask(task.id)}
+                              aria-label="移到以后"
+                            >
+                              <Clock3 className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                          <button
+                            className="ghost-button"
+                            type="button"
+                            onClick={() => exportOneTask(task)}
+                            aria-label="导出到日历"
+                          >
                             <Download className="h-4 w-4" />
                           </button>
                           {!task.system ? (
-                            <button className="ghost-button text-rose-500" type="button" onClick={() => deleteTask(task.id)}>
+                            <button
+                              className="ghost-button text-rose-500"
+                              type="button"
+                              onClick={() => deleteTask(task.id)}
+                              aria-label="删除任务"
+                            >
                               <Trash2 className="h-4 w-4" />
                             </button>
                           ) : null}
@@ -788,7 +961,7 @@ function App() {
                   ) : (
                     <div className="empty-state">
                       <PackageOpen className="h-8 w-8 text-slate-300" />
-                      <p>这一栏目前没有任务，可以从上面快速加一个。</p>
+                      <p>{taskFilter === 'done' ? '这里暂时还没有已完成事项。' : '这一舱目前没有任务，可以放心先不管。'}</p>
                     </div>
                   )}
                 </div>
@@ -996,6 +1169,17 @@ function App() {
               ) : null}
             </div>
           </div>
+        ) : null}
+
+        {!showProfileSheet && catchUpTask ? (
+          <CatchUpDeck
+            task={catchUpTask}
+            remainingCount={catchUpTaskIds.length}
+            categoryLabel={categoryLabel[catchUpTask.category]}
+            categoryTone={categoryTone[catchUpTask.category]}
+            onMarkDone={() => reviewCatchUpTask('done')}
+            onMarkRescue={() => reviewCatchUpTask('rescue')}
+          />
         ) : null}
       </div>
     </div>

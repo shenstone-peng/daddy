@@ -1,5 +1,5 @@
 import type { AppState, MilestoneEvent, MilestoneKind, PregnancyProfile, TaskCategory, TaskItem, TaskPriority } from '../types';
-import { compareDateInputs, getDefaultDueDate, getPregnancyWeekDate, toDateInputValue } from '../lib/date';
+import { compareDateInputs, getDefaultDueDate, getPregnancyWeekDate } from '../lib/date';
 
 type TaskTemplate = {
   key: string;
@@ -162,7 +162,6 @@ function sortMilestones(milestones: MilestoneEvent[]) {
 }
 
 export function buildSeededState(profile: PregnancyProfile, existingState?: AppState): AppState {
-  const today = toDateInputValue(new Date());
   const existingTaskMap = new Map(
     (existingState?.tasks ?? [])
       .filter((task) => task.system)
@@ -185,7 +184,7 @@ export function buildSeededState(profile: PregnancyProfile, existingState?: AppS
       category: template.category,
       dueDate,
       priority: template.priority,
-      status: previous?.status ?? (compareDateInputs(dueDate, today) < 0 ? 'done' : 'todo'),
+      status: previous?.status ?? 'todo',
       reminderDate: previous?.reminderDate,
       system: true,
       calendarExported: previous?.calendarExported ?? false,

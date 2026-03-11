@@ -137,6 +137,38 @@ textarea {
   flex-shrink: 0;
 }
 
+.summary-chip {
+  border-radius: 22px;
+  background: rgba(246, 248, 255, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  padding: 0.95rem 1rem;
+}
+
+.summary-chip span {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8b96b1;
+}
+
+.summary-chip strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  color: #172033;
+}
+
+.summary-chip-warn {
+  background: rgba(255, 246, 246, 0.96);
+}
+
+.summary-chip-success {
+  background: rgba(242, 252, 247, 0.94);
+}
+
 .list-card {
   border-radius: 26px;
   background: rgba(255, 255, 255, 0.88);
@@ -331,6 +363,72 @@ textarea {
   border: 1px solid rgba(255, 255, 255, 0.92);
   box-shadow: 0 18px 54px rgba(15, 23, 42, 0.16);
   padding: 1.25rem;
+}
+
+.catch-up-panel {
+  width: 100%;
+  max-width: 420px;
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.2);
+  padding: 1.25rem;
+}
+
+.swipe-stage {
+  position: relative;
+  height: 24rem;
+}
+
+.swipe-card,
+.swipe-card-ghost {
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+}
+
+.swipe-card-ghost {
+  background: linear-gradient(180deg, rgba(242, 245, 255, 0.96), rgba(255, 255, 255, 0.9));
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.swipe-card-ghost-back {
+  transform: translateY(18px) scale(0.96);
+  opacity: 0.42;
+}
+
+.swipe-card-ghost-front {
+  transform: translateY(9px) scale(0.98);
+  opacity: 0.68;
+}
+
+.swipe-card {
+  background:
+    radial-gradient(circle at top right, rgba(91, 124, 255, 0.16), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 255, 0.94));
+  border: 1px solid rgba(145, 158, 194, 0.2);
+  box-shadow: 0 22px 46px rgba(15, 23, 42, 0.14);
+  padding: 1.25rem;
+  touch-action: none;
+  user-select: none;
+}
+
+.swipe-badge {
+  border-radius: 999px;
+  padding: 0.32rem 0.72rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  transform: translateY(6px);
+}
+
+.swipe-badge-done {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.swipe-badge-rescue {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
 }
 
 .progress-ring {
