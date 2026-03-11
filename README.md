@@ -1,20 +1,30 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 准爸爸领航员
 
-# Run and deploy your AI Studio app
+面向中国准爸爸的孕期陪伴 PWA。首版提供 3 个核心能力：
 
-This contains everything you need to run your app locally.
+- 孕期仪表盘：按预产期自动计算孕周、倒计时和本周重点。
+- 清单管理：内置常见产检/待产事项，也支持自定义任务。
+- 提醒导出：把关键节点和待办一键导出为 `.ics`，同步到系统日历。
 
-View your app in AI Studio: https://ai.studio/apps/c0924579-44de-44e6-82d1-df31e9033a59
+## 本地开发
 
-## Run Locally
+```bash
+npm install
+npm run dev
+```
 
-**Prerequisites:**  Node.js
+## 构建
 
+```bash
+npm run lint
+npm run build
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 部署到 Vercel
+
+1. 将仓库推到 GitHub。
+2. 在 Vercel 导入该仓库。
+3. 保持默认识别的 `Vite` 框架设置即可。
+4. 构建完成后，打开站点并在移动端测试安装体验。
+
+当前首版无需环境变量。
