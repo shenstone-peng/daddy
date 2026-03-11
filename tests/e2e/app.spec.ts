@@ -101,6 +101,24 @@ test.describe('Pregnancy companion regression', () => {
   test('TC-003 bottom navigation routes between dashboard, tasks, and reminders', async ({ page }) => {
     await onboardToDashboard(page);
 
+    const navDock = page.locator('.bottom-nav-frame');
+    const navBeforeScroll = await navDock.boundingBox();
+    if (!navBeforeScroll) {
+      throw new Error('Bottom navigation dock is not visible.');
+    }
+
+    await page.locator('.app-main').evaluate((node) => {
+      node.scrollTop = node.scrollHeight;
+    });
+    await page.waitForTimeout(120);
+
+    const navAfterScroll = await navDock.boundingBox();
+    if (!navAfterScroll) {
+      throw new Error('Bottom navigation dock disappeared after scrolling.');
+    }
+
+    expect(Math.abs(navAfterScroll.y - navBeforeScroll.y)).toBeLessThan(2);
+
     await page.getByRole('button', { name: '清单', exact: true }).click();
     await expect(page.getByRole('heading', { level: 1, name: '陪伴清单' })).toBeVisible();
 

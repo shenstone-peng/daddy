@@ -527,9 +527,9 @@ function App() {
 
   return (
     <div className="mx-auto min-h-svh w-full max-w-[430px] px-3 py-4 sm:px-6 sm:py-8">
-      <div className="app-shell relative min-h-[calc(100svh-2rem)] overflow-hidden sm:min-h-[860px]">
+      <div className="app-shell">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,_rgba(91,124,255,0.2),_transparent_68%)]" />
-        <header className="relative z-10 px-5 pb-4 pt-6">
+        <header className="app-header relative z-10 px-5 pb-4 pt-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[12px] font-semibold uppercase tracking-[0.24em] text-slate-400">
@@ -567,7 +567,7 @@ function App() {
           ) : null}
         </header>
 
-        <main className="relative z-10 flex-1 overflow-y-auto px-5 pb-32">
+        <main className="app-main relative z-10 px-5">
           {activeTab === 'dashboard' && profile && overview ? (
             <div className="space-y-5 pb-6">
               <section className="hero-card">
@@ -1083,24 +1083,26 @@ function App() {
           ) : null}
         </main>
 
-        <nav className="bottom-nav">
-          {tabMeta.map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
+        <div className="bottom-nav-frame">
+          <nav className="bottom-nav">
+            {tabMeta.map((tab) => {
+              const Icon = tab.icon;
+              const active = activeTab === tab.id;
 
-            return (
-              <button
-                key={tab.id}
-                className={`nav-item ${active ? 'nav-item-active' : ''}`}
-                type="button"
-                onClick={() => startTransition(() => setActiveTab(tab.id))}
-              >
-                <Icon className="h-6 w-6" strokeWidth={active ? 2.4 : 1.8} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+              return (
+                <button
+                  key={tab.id}
+                  className={`nav-item ${active ? 'nav-item-active' : ''}`}
+                  type="button"
+                  onClick={() => startTransition(() => setActiveTab(tab.id))}
+                >
+                  <Icon className="h-6 w-6" strokeWidth={active ? 2.4 : 1.8} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
 
         {showProfileSheet ? (
           <div className="modal-backdrop">
