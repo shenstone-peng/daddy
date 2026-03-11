@@ -252,8 +252,14 @@ function App() {
   const overview = profile ? getPregnancyOverview(profile.dueDate) : null;
   const pendingTasks = state.tasks.filter((task) => task.status === 'todo');
   const completedTasks = state.tasks.filter((task) => task.status === 'done');
-  const focusTask = [...pendingTasks].sort((left, right) => compareDateInputs(left.dueDate, right.dueDate))[0];
-  const upcomingTasks = pendingTasks.filter((task) => diffInDays(parseDateInput(task.dueDate), new Date()) <= 7);
+  const overdueTasks = pendingTasks.filter((task) => diffInDays(parseDateInput(task.dueDate), new Date()) < 0);
+  const upcomingTasks = pendingTasks.filter((task) => {
+    const daysUntil = diffInDays(parseDateInput(task.dueDate), new Date());
+    return daysUntil >= 0 && daysUntil <= 7;
+  });
+  const focusTask =
+    [...upcomingTasks].sort((left, right) => compareDateInputs(left.dueDate, right.dueDate))[0] ??
+    [...pendingTasks].sort((left, right) => compareDateInputs(left.dueDate, right.dueDate))[0];
   const laterTasks = pendingTasks.filter((task) => diffInDays(parseDateInput(task.dueDate), new Date()) > 7);
   const filteredTasks =
     taskFilter === 'all'
@@ -562,6 +568,11 @@ function App() {
                         ? `${formatMonthDay(focusTask.dueDate)} · ${formatRelativeLabel(focusTask.dueDate)}`
                         : '当前没有紧急待办，可以先陪她散步、补觉，或者把后续检查预约提前确认。'}
                     </p>
+                    {overdueTasks.length ? (
+                      <p className="mt-2 text-xs font-medium text-rose-500">
+                        另有 {overdueTasks.length} 项逾期任务，建议进清单页逐一处理。
+                      </p>
+                    ) : null}
                   </div>
                   <button
                     className="icon-action shrink-0"

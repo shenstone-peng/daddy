@@ -60,6 +60,10 @@ function buildCalendar(events: CalendarExportEvent[]) {
   ].join('\r\n');
 }
 
+function sanitizeFilename(filename: string) {
+  return filename.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-');
+}
+
 export function downloadCalendarFile(events: CalendarExportEvent[], filename: string) {
   if (!events.length) {
     return;
@@ -72,7 +76,7 @@ export function downloadCalendarFile(events: CalendarExportEvent[], filename: st
   const url = URL.createObjectURL(file);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = filename;
+  anchor.download = sanitizeFilename(filename);
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();

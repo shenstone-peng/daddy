@@ -283,6 +283,7 @@ textarea {
   bottom: 1rem;
   left: 1rem;
   right: 1rem;
+  z-index: 20;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.6rem;
